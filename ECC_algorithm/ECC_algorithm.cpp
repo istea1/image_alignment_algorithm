@@ -62,6 +62,7 @@ Mat image_alignment(Mat im, int block_size) {
 	Size sz = im.size();
 	int height = sz.height;
 	int width = sz.width;
+
 	vector<Vec3b> blocks = return_blocks(im, block_size, 20);
 
 	vector<Mat> big_channels;
@@ -93,12 +94,11 @@ Mat image_alignment(Mat im, int block_size) {
 	TermCriteria criteria(TermCriteria::COUNT + TermCriteria::EPS,
 		number_of_iterations, termination_eps);
 
-	int bs = 64;
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < blocks.size(); j++) {
 			int x = blocks[j][0];
 			int y = blocks[j][1];
-			double cc = findecc(get_gradient(Mat(big_channels[2], Rect(x, y, bs, bs))), get_gradient(Mat(big_channels[i], Rect(x, y, bs, bs))), warp_matrix, warp_mode, criteria, Mat(), 5);
+			double cc = findecc(get_gradient(Mat(big_channels[2], Rect(x, y, block_size, block_size))), get_gradient(Mat(big_channels[i], Rect(x, y, block_size, block_size))), warp_matrix, warp_mode, criteria, Mat(), 5);
 		}
 		if (warp_mode != MOTION_HOMOGRAPHY) {
 			warpAffine(big_channels[i], aligned_channels[i], warp_matrix, aligned_channels[0].size(), INTER_LINEAR + WARP_INVERSE_MAP);
