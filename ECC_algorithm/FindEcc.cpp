@@ -59,7 +59,6 @@ vector<Vec3b> return_blocks(Mat img, int block_size, int quality) {
                     Vec3b pixel_val = img.at<Vec3b>(y, x);
                     for (int k = 0; k < 3; k++) {
                         if (pixel_val[k] < med_vals[k] - quality or pixel_val[k] > med_vals[k] + quality) {
-                            //img.at<Vec3b>(y, x) = (0, 0, 0);
                             interesting_pixels += 1;
                             break;
                         }
@@ -75,81 +74,6 @@ vector<Vec3b> return_blocks(Mat img, int block_size, int quality) {
     return info_blocks;
 }
 
-vector<Vec3b> return_blocks_v2(Mat img, int block_size, int quality) {
-    int height = img.size().height;
-    int width = img.size().width;
-    // создаем наш список информативных фрагментов картинки
-    vector<Vec3b> info_blocks;
-    // обозначаем динамичный шаг
-    int step_i = min(block_size, height);
-    int step_j = min(block_size, width);
-    int number_of_pixels_in_block = block_size * block_size;
-    vector<Vec3b> maybe_background_color;
-    vector <int> mb_b_c_count;
-    mb_b_c_count.push_back(0);
-    maybe_background_color.push_back(Vec3b(0, 0, 0));
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width; j++) {
-            Vec3b pixel_val = img.at<Vec3b>(i, j);
-            bool is_color_released = false;
-            for (int g = 0; g < maybe_background_color.size(); g++) {
-                if (is_color_released) {
-                    break;
-                }
-                for (int k = 0; k < 3; k++) {
-                    
-                    if ((int(maybe_background_color[g][k]) - quality < int(pixel_val[k])) and (int(pixel_val[k]) < int(maybe_background_color[g][k]) + quality)) {
-                        mb_b_c_count[g] += 1;
-                        is_color_released = true;
-                    }
-                }
-            }
-            if (not is_color_released) {
-                maybe_background_color.push_back(pixel_val);
-                mb_b_c_count.push_back(1);
-            }
-        }
-    }
-    int max_i = 0;
-    int max_count = -1;
-    int blocks = 0;
-    for (int index = 0; index < mb_b_c_count.size(); index++) {
-        if (mb_b_c_count[index] > max_count) {
-            max_i = index;
-            max_count = mb_b_c_count[index];
-        }
-    }
-    for (int i = 0; i < height; i += step_i) {
-        step_i = min(block_size, height - i);
-        for (int j = 0; j < width; j += step_j) {
-            step_j = min(block_size, width - j);
-            int interesting_pixels = 0;
-            for (int y = i; y < i + step_i; y++) {
-                if (y == height) {
-                    break;
-                }
-                for (int x = j; x < j + step_j; x++) {
-                    if (x == width) {
-                        break;
-                    }
-                    Vec3b pixel_val = img.at<Vec3b>(y, x);
-                    for (int k = 0; k < 3; k++) {
-                        if ((int(maybe_background_color[max_i][k]) - quality > int(pixel_val[k])) or (int(pixel_val[k]) > int(maybe_background_color[max_i][k]) + quality)) {
-                            interesting_pixels += 1;
-                        }
-                    }
-                }
-            }
-            if (interesting_pixels > int(0.5 * block_size * block_size)) {
-                info_blocks.push_back(Vec3b(i, j, block_size));
-
-            }
-            blocks += 1;
-        }
-    }
-    cout << blocks;
-    return info_blocks;
-}
 
 double findecc(InputArray templateImage,
                InputArray inputImage,
@@ -658,53 +582,5 @@ static void update_warping_matrix_ECC(Mat& map_matrix, const Mat& update, const 
         mapPtr[3] = (float)sin(new_theta);
         mapPtr[1] = -mapPtr[3];
     }
-}
-
-
-/** Function that computes enhanced corelation coefficient from Georgios et.al. 2008
-*   See https://github.com/opencv/opencv/issues/12432
-*/
-double computeECC(InputArray templateImage, InputArray inputImage, InputArray inputMask)
-{
-    CV_Assert(!templateImage.empty());
-    CV_Assert(!inputImage.empty());
-
-    if (!(templateImage.type() == inputImage.type()))
-        CV_Error(Error::StsUnmatchedFormats, "Both input images must have the same data type");
-
-    Scalar meanTemplate, sdTemplate;
-
-    int active_pixels = inputMask.empty() ? templateImage.size().area() : countNonZero(inputMask);
-    int type = templateImage.type();
-    meanStdDev(templateImage, meanTemplate, sdTemplate, inputMask);
-    Mat templateImage_zeromean = Mat::zeros(templateImage.size(), templateImage.type());
-    Mat templateMat = templateImage.getMat();
-    Mat inputMat = inputImage.getMat();
-
-    /*
-     * For unsigned ints, when the mean is computed and subtracted, any values less than the mean
-     * will be set to 0 (since there are no negatives values). This impacts the norm and dot product, which
-     * ultimately results in an incorrect ECC. To circumvent this problem, if unsigned ints are provided,
-     * we convert them to a signed ints with larger resolution for the subtraction step.
-     */
-    if (type == CV_8U || type == CV_16U) {
-        int newType = type == CV_8U ? CV_16S : CV_32S;
-        Mat templateMatConverted, inputMatConverted;
-        templateMat.convertTo(templateMatConverted, newType);
-        cv::swap(templateMat, templateMatConverted);
-        inputMat.convertTo(inputMatConverted, newType);
-        cv::swap(inputMat, inputMatConverted);
-    }
-    subtract(templateMat, meanTemplate, templateImage_zeromean, inputMask);
-    double templateImagenorm = std::sqrt(active_pixels * sdTemplate.val[0] * sdTemplate.val[0]);
-
-    Scalar meanInput, sdInput;
-
-    Mat inputImage_zeromean = Mat::zeros(inputImage.size(), inputImage.type());
-    meanStdDev(inputImage, meanInput, sdInput, inputMask);
-    subtract(inputMat, meanInput, inputImage_zeromean, inputMask);
-    double inputImagenorm = std::sqrt(active_pixels * sdInput.val[0] * sdInput.val[0]);
-
-    return templateImage_zeromean.dot(inputImage_zeromean) / (templateImagenorm * inputImagenorm);
 }
 
