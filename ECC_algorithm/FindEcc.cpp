@@ -1,79 +1,66 @@
 #include "FindEcc.h"
 #include <stdint.h>
-#include "opencv2/core.hpp"
-#include "opencv2/imgproc/hal/interface.h"
-#include "opencv2/core/mat.hpp"
-#include "opencv2/opencv_modules.hpp"
-
 
 using namespace std;
 using namespace cv;
 
-
-vector<Vec3b> return_blocks(Mat img, int block_size, int quality) {
-    // создаем константы высоты и ширины картинки
-    int height = img.size().height;
-    int width = img.size().width;
-    // создаем наш список информативных фрагментов картинки
-    vector<Vec3b> info_blocks;
-    // обозначаем динамичный шаг
-    int step_i = min(block_size, height);
-    int step_j = min(block_size, width);
-    int number_of_pixels_in_block = block_size * block_size;
-    for (int i = 0; i < height; i += step_i) {
-        step_i = min(block_size, height - i);
-        for (int j = 0; j < width; j += step_j) {
-            step_j = min(block_size, width - j);
-            // создаем переменную, значения в которой будут обозначать среднее значение каждого цвета на нашем блоке
-            int med_vals[] = { 0, 0, 0 };
-            // пробегаемся отдельно по каждому пикселю в блоке
-            for (int y = i; y < i + block_size; y++) {
-                if (y == height) {
-                    break;
-                }
-                for (int x = j; x < j + block_size; x++) {
-                    if (x == width) {
-                        break;
-                    }
-                    // закидываем значение каждого канала каждого пикселя в блоке в нашу среднюю величину
-                    Vec3b pixel_val = img.at<Vec3b>(y, x);
-                    med_vals[0] += pixel_val[0];
-                    med_vals[1] += pixel_val[1];
-                    med_vals[2] += pixel_val[2];
-                }
-            }
-            // считаем среднее значение каждого канала
-            med_vals[0] /= number_of_pixels_in_block;
-            med_vals[1] /= number_of_pixels_in_block;
-            med_vals[2] /= number_of_pixels_in_block;
-            int interesting_pixels = 0;
-            for (int y = i; y < i + block_size; y++) {
-                if (y == height) {
-                    break;
-                }
-                for (int x = j; x < j + block_size; x++) {
-                    if (x == width) {
-                        break;
-                    }
-                    //делаем проверку каждого канала относительно среднего с небольшим отклонением +-
-                    Vec3b pixel_val = img.at<Vec3b>(y, x);
-                    for (int k = 0; k < 3; k++) {
-                        if (pixel_val[k] < med_vals[k] - quality or pixel_val[k] > med_vals[k] + quality) {
-                            interesting_pixels += 1;
-                            break;
-                        }
-                    }
-                }
-            }
-            //если пикселей с непохожим на фон блока цветом больше половины, закидываем координаты и размер блока в массив
-            if (interesting_pixels >= int(0.5 * block_size * block_size)) {
-                info_blocks.push_back(Vec3b(i, j, block_size));
+vector<vector<int>> return_blocks(Mat img, int block_size) {
+    vector<vector<int>> blocks;
+    Ptr<ORB> fast = ORB::create();
+    vector<KeyPoint> keypoints;
+    fast->detect(img, keypoints);
+    int quality = block_size;
+    for (int i = 0; i < keypoints.size(); i++) {
+        int y = keypoints[i].pt.y; 
+        int x = keypoints[i].pt.x;
+        for (int j = i + 1; j < keypoints.size(); j++) {
+            int y_check = keypoints[j].pt.y;
+            int x_check = keypoints[j].pt.x;
+            if ((y + quality > y_check) and (y - quality < y_check) and (x + quality > x_check) and (x - quality < x_check)) {
+                keypoints[j].pt.x = 0; 
+                keypoints[j].pt.y = 0;
             }
         }
     }
-    return info_blocks;
+    for (int i = 0; i < keypoints.size(); i++) {
+        int y = keypoints[i].pt.y;
+        int x = keypoints[i].pt.x;
+        if (y == 0 and x == 0) {
+            continue;
+        }
+        if (y + block_size >= img.size().height or x + block_size >= img.size().width) {
+            continue;
+        }
+        y = std::max((y - block_size / 2), 0);
+        x = std::max((x - block_size / 2), 0);
+        vector<int> block;
+        block.push_back(y);
+        block.push_back(x);
+        block.push_back(block_size);
+        //img.at<Vec3b>(y, x) = (0, 0, 0);
+        blocks.push_back(block);
+    }
+    return blocks; 
 }
 
+Mat blackng_blocks(Mat img, vector<vector<int>> blocks, int bls) {
+    for (int i = 0; i < blocks.size(); i++) {
+        for (int y = blocks[i][0]; y < blocks[i][0] + bls; y++) {
+            if (y == img.size().height) {
+                break;
+            }
+            for (int x = blocks[i][1]; x < blocks[i][1] + bls; x++) {
+                if (x == img.size().width) {
+                    break;
+                }
+                //cout << y << " " << x << "\n";
+                img.at<Vec3b>(y, x) = Vec3b(0, 0, 0);
+            }
+        }
+
+    }
+    return img;
+}
 
 double findecc(InputArray templateImage,
                InputArray inputImage,
