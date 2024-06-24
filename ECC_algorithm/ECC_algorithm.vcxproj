@@ -76,6 +76,12 @@
     <LibraryPath>C:\cv\opencv\build\x64\vc16\lib;$(LibraryPath)</LibraryPath>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ExecutablePath>C:\cv\opencv\build\x64\vc16\bin;$(ExecutablePath)</ExecutablePath>
+    <IncludePath>C:\cv\opencv\build\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\cv\opencv\build\x64\vc16\lib;$(LibraryPath)</LibraryPath>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -133,12 +139,9 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>C:\cv\opencv\build\x64\vc16\lib\opencv_world490.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="ECC_algorithm.cpp" />
-    <ClCompile Include="FindEcc.cpp" />
-  </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FindEcc.h" />
   </ItemGroup>

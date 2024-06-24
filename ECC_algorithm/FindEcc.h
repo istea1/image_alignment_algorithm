@@ -6,7 +6,9 @@ using namespace cv;
 using namespace std;
 
 
-vector<Vec3b> return_blocks(Mat img, int block_size, int quality);
+vector<vector<int>> return_blocks(Mat img, int block_size);
+
+Mat blackng_blocks(Mat img, vector<vector<int>> blocks, int bls);
 
 double findecc(InputArray templateImage,
 			   InputArray inputImage,
