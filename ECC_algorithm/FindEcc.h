@@ -8,6 +8,8 @@ using namespace std;
 
 vector<vector<int>> return_blocks(Mat img, int block_size);
 
+Mat blackng_blocks(Mat img, vector<vector<int>> blocks, int bls);
+
 double findecc(InputArray templateImage,
 			   InputArray inputImage,
 			   InputOutputArray warpMatrix,

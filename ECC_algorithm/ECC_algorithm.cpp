@@ -21,8 +21,10 @@ vector<Mat> full_channels(vector<Mat> channels, Mat im, int height, int width);
 
 int main(int argc, char **args)
 {                               
-	Mat im = imread(args[1]);
+	Mat im = imread("raw.tif");
 	int blocks_size = 128;
+	/*vector<vector<int>> blocks = return_blocks(im, blocks_size);
+	im = blackng_blocks(im, blocks, blocks_size);*/
 	im = image_alignment(im, blocks_size);
 	imwrite("out.png", im);
 	waitKey(0);
@@ -145,8 +147,9 @@ Mat image_alignment(Mat im, int block_size) {
 	aligned_channels[const_index] = big_channels[const_index].clone();
 
 	for (int i = 0; i < 2; i++) {
-		//warp_matrix_with_allpicture = make_warpMat_with_allpic(blocks, block_size, big_channels, warp_mode, criteria, is, i, const_index);
+		warp_matrix_with_allpicture = make_warpMat_with_allpic(blocks, block_size, big_channels, warp_mode, criteria, is, i, const_index);
 		warp_matrix_with_blocks = make_warpMat_with_blocks(blocks, block_size, big_channels, warp_mode, criteria, is, i, const_index);
+		//warpAffine(big_channels[is[i]].clone(), aligned_channels[is[i]], warp_matrix_with_allpicture, aligned_channels[0].size(), INTER_LINEAR + WARP_INVERSE_MAP);
 		warpAffine(big_channels[is[i]], aligned_channels[is[i]], warp_matrix_with_blocks, aligned_channels[0].size(), INTER_LINEAR + WARP_INVERSE_MAP);
 		
 	}

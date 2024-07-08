@@ -40,6 +40,12 @@ vector<vector<int>> return_blocks(Mat img, int block_size) {
         //img.at<Vec3b>(y, x) = (0, 0, 0);
         blocks.push_back(block);
     }
+    while (blocks.size() > 50) {
+        blocks.pop_back();
+        reverse(blocks.begin(), blocks.end());
+        blocks.pop_back();
+        reverse(blocks.begin(), blocks.end());
+    }
     return blocks; 
 }
 
