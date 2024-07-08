@@ -11,17 +11,18 @@ int show_warp_mat(Mat warp_matrix);
 
 Mat get_gradient(Mat gray_img);
 
-Mat image_alignment(Mat im, int block_size);
+vector<Mat> image_alignment_with_blocks(Mat im, int block_size);
 
-int compare_methods_of_image_alignment(Mat im, int block_size);
+vector<Mat> image_alignment_all_picture(Mat im);
+
+void compare_methods_of_image_alignment(Mat im, int block_size);
 
 vector<Mat> full_channels(vector<Mat> channels, Mat im, int height, int width);
 
 int main(int argc, char **args)
 {                               
-	Mat im = imread(args[1]);
+	Mat im = imread("raw.tif");
 	int blocks_size = 128;
-	im = image_alignment(im, blocks_size);
 	compare_methods_of_image_alignment(im, blocks_size);
 	imwrite("out.png", im);
 	waitKey(0);
@@ -69,11 +70,13 @@ vector<Mat> full_channels(vector<Mat> channels, Mat im, int height, int width) {
 	return channels;
 }
 
-Mat image_alignment(Mat im, int block_size) {
+vector<Mat> image_alignment_with_blocks(Mat im, int block_size) {
 	Size sz = im.size();
 	int height = sz.height;
 	int width = sz.width;
 
+	vector<Mat> res;
+	Mat seconds_box = Mat(2, 1, CV_32F);
 	vector<vector<int>> blocks = return_blocks(im, block_size);
 	vector<Mat> big_channels;
 	big_channels.push_back(Mat(height, width, CV_8UC1));
@@ -97,7 +100,7 @@ Mat image_alignment(Mat im, int block_size) {
 		warp_matrix = Mat::eye(2, 3, CV_32F);
 	}
 
-	int number_of_iterations = 200;
+	int number_of_iterations = 5000;
 	double termination_eps = 1e-10;
 
 	TermCriteria criteria(TermCriteria::COUNT + TermCriteria::EPS,
@@ -108,6 +111,7 @@ Mat image_alignment(Mat im, int block_size) {
 	for (int i = 0; i < 2; i++) {
 		vector<float> warp_matrixes_0;
 		vector<float> warp_matrixes_1;
+		clock_t start = clock();
 		for (int j = 0; j < blocks.size(); j++) {
 			warp_matrix = Mat::eye(2, 3, CV_32F);
 			int x = blocks[j][0];
@@ -115,7 +119,6 @@ Mat image_alignment(Mat im, int block_size) {
 			double cc = findecc(get_gradient(Mat(big_channels[1], Rect(y, x, block_size, block_size))), get_gradient(Mat(big_channels[is[i]], Rect(y, x, block_size, block_size))), warp_matrix, warp_mode, criteria, Mat(), 5);
 			warp_matrixes_0.push_back(warp_matrix.clone().at<float>(0, 2));
 			warp_matrixes_1.push_back(warp_matrix.clone().at<float>(1, 2));
-			//show_warp_mat(warp_matrixes[j]);
 		}
 		auto m = warp_matrixes_0.begin() + warp_matrixes_0.size() / 2;
 		nth_element(warp_matrixes_0.begin(), m, warp_matrixes_0.end());
@@ -123,8 +126,10 @@ Mat image_alignment(Mat im, int block_size) {
 		nth_element(warp_matrixes_1.begin(), m, warp_matrixes_1.end());
 		warp_matrix.at<float>(0, 2) = warp_matrixes_0[warp_matrixes_0.size() / 2];
 		warp_matrix.at<float>(1, 2) = warp_matrixes_1[warp_matrixes_1.size() / 2];
-
-		//double cc = findecc(get_gradient(big_channels[2]), get_gradient(big_channels[i]), warp_matrix, warp_mode, criteria, Mat(), 5);
+		clock_t end = clock();
+		double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+		seconds_box.at<float>(i, 0) = seconds;
+		res.push_back(warp_matrix.clone());
 
 		if (warp_mode != MOTION_HOMOGRAPHY) {
 			warpAffine(big_channels[is[i]], aligned_channels[is[i]], warp_matrix, aligned_channels[0].size(), INTER_LINEAR + WARP_INVERSE_MAP);
@@ -135,16 +140,18 @@ Mat image_alignment(Mat im, int block_size) {
 	}
 	Mat im_aligned;
 	merge(aligned_channels, im_aligned);
-	return im_aligned;
+	res.push_back(seconds_box);
+	res.push_back(im_aligned.clone());
+	return res;
 }
 
-int compare_methods_of_image_alignment(Mat im, int block_size) {
+vector<Mat> image_alignment_all_picture(Mat im) {
 	Size sz = im.size();
 	int height = sz.height;
 	int width = sz.width;
 
-	vector<vector<int>> blocks = return_blocks(im, block_size);
-	cout << "quantity of blocks: " << blocks.size() << "\n";
+	vector<Mat> res;
+	Mat seconds_box = Mat(2, 1, CV_32F);
 	vector<Mat> big_channels;
 	big_channels.push_back(Mat(height, width, CV_8UC1));
 	big_channels.push_back(Mat(height, width, CV_8UC1));
@@ -167,7 +174,7 @@ int compare_methods_of_image_alignment(Mat im, int block_size) {
 		warp_matrix = Mat::eye(2, 3, CV_32F);
 	}
 
-	int number_of_iterations = 200;
+	int number_of_iterations = 5000;
 	double termination_eps = 1e-10;
 
 	TermCriteria criteria(TermCriteria::COUNT + TermCriteria::EPS,
@@ -175,44 +182,15 @@ int compare_methods_of_image_alignment(Mat im, int block_size) {
 
 	int is[] = { 0, 2 };
 
-	string colors[] = {"red", "blue"};
-
 	for (int i = 0; i < 2; i++) {
-		cout << "\nnow iteration(compare correlation effect of " << colors[i] << " with green)" << "\n\n";
 		clock_t start = clock();
-		vector<float> warp_matrixes_0;
-		vector<float> warp_matrixes_1;
-		for (int j = 0; j < blocks.size(); j++) {
-			warp_matrix = Mat::eye(2, 3, CV_32F);
-			int x = blocks[j][0];
-			int y = blocks[j][1];
-			double cc = findecc(get_gradient(Mat(big_channels[1], Rect(y, x, block_size, block_size))), get_gradient(Mat(big_channels[is[i]], Rect(y, x, block_size, block_size))), warp_matrix, warp_mode, criteria, Mat(), 5);
-			warp_matrixes_0.push_back(warp_matrix.clone().at<float>(0, 2));
-			warp_matrixes_1.push_back(warp_matrix.clone().at<float>(1, 2));
-			//show_warp_mat(warp_matrixes[j]);
-		}
-		auto m = warp_matrixes_0.begin() + warp_matrixes_0.size() / 2;
-		nth_element(warp_matrixes_0.begin(), m, warp_matrixes_0.end());
-		m = warp_matrixes_1.begin() + warp_matrixes_1.size() / 2;
-		nth_element(warp_matrixes_1.begin(), m, warp_matrixes_1.end());
-		warp_matrix.at<float>(0, 2) = warp_matrixes_0[warp_matrixes_0.size() / 2];
-		warp_matrix.at<float>(1, 2) = warp_matrixes_1[warp_matrixes_1.size() / 2];
+
+		double cc = findecc(get_gradient(big_channels[1]), get_gradient(big_channels[is[i]]), warp_matrix, warp_mode, criteria, Mat(), 5);
 		clock_t end = clock();
 		double seconds = (double)(end - start) / CLOCKS_PER_SEC;
-		cout << "Method with blocks, it worked " << seconds << "\n";
-		show_warp_mat(warp_matrix);
-		if (warp_mode == MOTION_HOMOGRAPHY) {
-			warp_matrix = Mat::eye(3, 3, CV_32F);
-		}
-		else {
-			warp_matrix = Mat::eye(2, 3, CV_32F);
-		}
-		start = clock();
-		double cc = findecc(get_gradient(big_channels[1]), get_gradient(big_channels[is[i]]), warp_matrix, warp_mode, criteria, Mat(), 5);
-		end = clock();
-		seconds = (double)(end - start) / CLOCKS_PER_SEC;
-		cout << "Method without blocks, it worked " << seconds << "\n";
-		show_warp_mat(warp_matrix);
+		seconds_box.at<float>(i, 0) = seconds;
+		res.push_back(warp_matrix.clone());
+
 		if (warp_mode != MOTION_HOMOGRAPHY) {
 			warpAffine(big_channels[is[i]], aligned_channels[is[i]], warp_matrix, aligned_channels[0].size(), INTER_LINEAR + WARP_INVERSE_MAP);
 		}
@@ -220,5 +198,33 @@ int compare_methods_of_image_alignment(Mat im, int block_size) {
 			warpPerspective(big_channels[is[i]], aligned_channels[is[i]], warp_matrix, aligned_channels[0].size(), INTER_LINEAR + WARP_INVERSE_MAP);
 		}
 	}
-	return 0;
+	Mat im_aligned;
+	merge(aligned_channels, im_aligned);
+	res.push_back(seconds_box);
+	res.push_back(im_aligned.clone());
+	return res;
+}
+
+void compare_methods_of_image_alignment(Mat im, int block_size) {
+	vector<Mat> res_with_blocks = image_alignment_with_blocks(im, block_size);
+	vector<Mat> res_without_blocks = image_alignment_all_picture(im);
+	vector<vector<Mat>> warp_matrixes;
+	vector<Mat> seconds_boxs;
+	for (int i = 0; i < 2; i++) {
+		warp_matrixes.push_back(vector<Mat>());
+		warp_matrixes[i].push_back(res_with_blocks[i].clone());
+		warp_matrixes[i].push_back(res_without_blocks[i].clone());
+	}
+	seconds_boxs.push_back(res_with_blocks[2]);
+	seconds_boxs.push_back(res_without_blocks[2]);
+
+	for (int i = 0; i < 2; i++) {
+		cout << "\ncheck warp matrixes, first matrix is from method with blocks, second matrix is from method with all picture\n";
+		Mat warp_mat_1 = warp_matrixes[i][0];
+		Mat warp_mat_2 = warp_matrixes[i][1];
+		cout << "first method worked " << seconds_boxs[0].at<float>(i, 0) << "\n";
+		show_warp_mat(warp_mat_1);
+		cout << "second method worked " << seconds_boxs[1].at<float>(i, 0) << "\n";
+		show_warp_mat(warp_mat_2);
+	}
 }
